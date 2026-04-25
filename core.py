@@ -439,6 +439,7 @@ class WGameManager:
             self._batch_download(tasks)
             self.md5_cache.save()
             self._update_local_config()
+            self._fix_kr_channel_id()
         else:
             logger.info("所有文件校验通过，无需下载。")
 
@@ -449,6 +450,7 @@ class WGameManager:
         # 确保游戏根目录存在
         self.game_folder.mkdir(parents=True, exist_ok=True)
         self.sync_files(force_check_md5=False)
+        self._fix_kr_channel_id()
 
         logger.info(f"{self.server_type} 服完整客户端下载完毕！")
 
@@ -617,3 +619,21 @@ class WGameManager:
             with open(self.game_folder / "launcherDownloadConfig.json", "w") as f:
                 json.dump(cfg, f, indent=4)
             logger.info(f"本地配置已更新: {self.server_type} ({v})")
+
+    def _fix_kr_channel_id(self):
+        config_file = self.game_folder / "Client/Binaries/Win64/ThirdParty/KrPcSdk_Mainland/KRSDKRes/KRSDKConfig.json"
+        if not config_file.exists():
+            logger.debug("KRSDKConfig.json 不存在，跳过 Channel ID 修复")
+            return
+
+        try:
+            data = json.loads(config_file.read_text(encoding="utf-8"))
+            if data.get("KR_ChannelId") == 205:
+                logger.debug("KR_ChannelId 已经是 205，无需修改")
+                return
+
+            data["KR_ChannelId"] = 205
+            config_file.write_text(json.dumps(data, indent=4, ensure_ascii=False), encoding="utf-8")
+            logger.info(f"已修复 KR_ChannelId 为 205")
+        except Exception as e:
+            logger.warning(f"修复 KR_ChannelId 失败: {e}")
